@@ -368,15 +368,236 @@ def remove_type_annotations(code: str) -> str:
 # ---------------------------------------------------------------------------
 
 def combined_attack(code: str) -> str:
-    """Apply all attacks in sequence for maximum disruption."""
+    """Apply all attacks in sequence for maximum disruption.
+
+    Note: dead_code insertion is excluded because it adds tokens that
+    counterintuitively *increase* z-scores (more green tokens from the
+    added code), masking the effect of other attacks.
+    """
     code = remove_type_annotations(code)
     code = remove_comments(code)
     code = rename_variables(code)
     code = rewrite_expressions(code)
     code = swap_if_else(code)
-    code = insert_dead_code(code)
     code = reformat_code(code)
     return code
+
+
+# ---------------------------------------------------------------------------
+# Attack 9: Structural Paraphrase (aggressive AST rewriting)
+# ---------------------------------------------------------------------------
+
+class _ForToWhile(ast.NodeTransformer):
+    """Convert for-range loops to while loops."""
+
+    def visit_For(self, node):
+        self.generic_visit(node)
+        # Only convert `for var in range(...)` patterns
+        if not (
+            isinstance(node.iter, ast.Call)
+            and isinstance(node.iter.func, ast.Name)
+            and node.iter.func.id == "range"
+            and isinstance(node.target, ast.Name)
+        ):
+            return node
+
+        args = node.iter.args
+        if len(args) == 1:
+            start, stop, step = ast.Constant(value=0), args[0], ast.Constant(value=1)
+        elif len(args) == 2:
+            start, stop, step = args[0], args[1], ast.Constant(value=1)
+        elif len(args) == 3:
+            start, stop, step = args[0], args[1], args[2]
+        else:
+            return node
+
+        var = node.target
+        # var = start
+        init = ast.Assign(targets=[ast.Name(id=var.id, ctx=ast.Store())], value=start)
+        # var < stop
+        test = ast.Compare(
+            left=ast.Name(id=var.id, ctx=ast.Load()),
+            ops=[ast.Lt()],
+            comparators=[stop],
+        )
+        # var += step
+        increment = ast.AugAssign(
+            target=ast.Name(id=var.id, ctx=ast.Store()),
+            op=ast.Add(),
+            value=step,
+        )
+        while_body = list(node.body) + [increment]
+        while_node = ast.While(test=test, body=while_body, orelse=node.orelse)
+        return [init, while_node]
+
+
+class _ListCompToLoop(ast.NodeTransformer):
+    """Convert list comprehensions to explicit for-append loops."""
+
+    def __init__(self):
+        self.counter = 0
+
+    def visit_Assign(self, node):
+        self.generic_visit(node)
+        if not (
+            len(node.targets) == 1
+            and isinstance(node.value, ast.ListComp)
+        ):
+            return node
+
+        comp = node.value
+        if len(comp.generators) != 1 or comp.generators[0].ifs:
+            return node  # Only handle simple single-loop comprehensions
+
+        gen = comp.generators[0]
+        target_name = node.targets[0]
+        tmp_name = f"_comp_{self.counter}"
+        self.counter += 1
+
+        # tmp = []
+        init = ast.Assign(
+            targets=[ast.Name(id=tmp_name, ctx=ast.Store())],
+            value=ast.List(elts=[], ctx=ast.Load()),
+        )
+        # tmp.append(elt)
+        append_call = ast.Expr(
+            value=ast.Call(
+                func=ast.Attribute(
+                    value=ast.Name(id=tmp_name, ctx=ast.Load()),
+                    attr="append",
+                    ctx=ast.Load(),
+                ),
+                args=[comp.elt],
+                keywords=[],
+            )
+        )
+        # for target in iter: tmp.append(elt)
+        loop = ast.For(target=gen.target, iter=gen.iter, body=[append_call], orelse=[])
+        # original_target = tmp
+        assign_back = ast.Assign(
+            targets=[target_name],
+            value=ast.Name(id=tmp_name, ctx=ast.Load()),
+        )
+        return [init, loop, assign_back]
+
+
+class _AugAssignSwap(ast.NodeTransformer):
+    """Swap augmented assignments: x += 1 -> x = x + 1 (and vice versa)."""
+
+    _OP_MAP = {
+        ast.Add: ast.Add,
+        ast.Sub: ast.Sub,
+        ast.Mult: ast.Mult,
+        ast.Div: ast.Div,
+        ast.Mod: ast.Mod,
+    }
+
+    def visit_AugAssign(self, node):
+        self.generic_visit(node)
+        # Convert x += val to x = x + val
+        if isinstance(node.target, ast.Name):
+            return ast.Assign(
+                targets=[ast.Name(id=node.target.id, ctx=ast.Store())],
+                value=ast.BinOp(
+                    left=ast.Name(id=node.target.id, ctx=ast.Load()),
+                    op=node.op,
+                    right=node.value,
+                ),
+            )
+        return node
+
+
+def structural_paraphrase(code: str) -> str:
+    """Aggressive structural paraphrase via AST transforms.
+
+    Chains multiple structural changes: for-to-while conversion,
+    list comprehension expansion, augmented assignment expansion,
+    variable renaming, and expression rewriting.
+    """
+    try:
+        tree = ast.parse(code)
+        tree = _ForToWhile().visit(tree)
+        ast.fix_missing_locations(tree)
+        code = ast.unparse(tree)
+    except Exception:
+        pass
+
+    try:
+        tree = ast.parse(code)
+        tree = _ListCompToLoop().visit(tree)
+        ast.fix_missing_locations(tree)
+        code = ast.unparse(tree)
+    except Exception:
+        pass
+
+    try:
+        tree = ast.parse(code)
+        tree = _AugAssignSwap().visit(tree)
+        ast.fix_missing_locations(tree)
+        code = ast.unparse(tree)
+    except Exception:
+        pass
+
+    # Chain with existing attacks
+    code = rename_variables(code)
+    code = rewrite_expressions(code)
+    code = reformat_code(code)
+    return code
+
+
+# ---------------------------------------------------------------------------
+# Attack 10: LLM-based Code Paraphrase
+# ---------------------------------------------------------------------------
+
+def llm_paraphrase(code: str) -> str:
+    """Paraphrase code using an LLM API.
+
+    Tries OpenAI API first (requires OPENAI_API_KEY env var),
+    then falls back to structural_paraphrase if unavailable.
+    """
+    import os as _os
+
+    api_key = _os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        return structural_paraphrase(code)
+
+    try:
+        import openai
+
+        client = openai.OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a code rewriter. Rewrite the given Python code "
+                        "to be functionally equivalent but with different coding "
+                        "style, variable names, loop structures, and expressions. "
+                        "Keep the same function signature and docstring. "
+                        "Only output the Python code, no explanations or markdown."
+                    ),
+                },
+                {"role": "user", "content": code},
+            ],
+            temperature=0.7,
+            max_tokens=2048,
+        )
+        result = response.choices[0].message.content.strip()
+        # Strip markdown code fences if present
+        if result.startswith("```"):
+            lines = result.split("\n")
+            lines = lines[1:]  # Remove opening fence
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            result = "\n".join(lines)
+        # Verify valid Python
+        ast.parse(result)
+        return result
+    except ImportError:
+        return structural_paraphrase(code)
+    except Exception:
+        return structural_paraphrase(code)
 
 
 # ---------------------------------------------------------------------------
@@ -391,5 +612,7 @@ ALL_ATTACKS = {
     "swap_if_else": swap_if_else,
     "rewrite_expressions": rewrite_expressions,
     "remove_type_annotations": remove_type_annotations,
+    "structural_paraphrase": structural_paraphrase,
+    "llm_paraphrase": llm_paraphrase,
     "combined": combined_attack,
 }

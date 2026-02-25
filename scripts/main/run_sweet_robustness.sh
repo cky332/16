@@ -36,7 +36,10 @@ for transform in $transforms; do
     echo "=========================================="
     echo "Running detection on: ${transform}"
     echo "=========================================="
-    accelerate launch main.py \
+    # Use single process + device_map=auto to shard model across GPUs
+    # (evaluation-only mode loads model on main process only, so multi-process
+    #  would OOM trying to fit the full model on a single GPU)
+    accelerate launch --num_processes 1 main.py \
         --model bigcode/starcoder \
         --use_auth_token \
         --task humaneval \
@@ -53,7 +56,8 @@ for transform in $transforms; do
         --sweet \
         --gamma $gamma \
         --delta $delta \
-        --entropy_threshold $entropy_threshold
+        --entropy_threshold $entropy_threshold \
+        --device_map auto
 done
 
 echo ""

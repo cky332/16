@@ -293,6 +293,7 @@ def main():
             "Choose only one between 1) detecting generated code vs 2) human code"
 
         # here we don't generate code but only evaluate previously computed generations
+        model = None  # default for non-main processes and non-SWEET mode
         if accelerator.is_main_process:
             print("evaluation only mode")
 

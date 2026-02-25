@@ -210,13 +210,40 @@ def apply_transforms(code, transforms, transformer):
     return result
 
 
-def transform_generations(generations, transformer, transforms):
-    """Apply transformations to all generations."""
+def transform_generations(generations, transformer, transforms, prompts=None):
+    """Apply transformations to all generations.
+
+    If prompts is provided, only transform the generated portion (after the prompt),
+    preserving the prompt prefix so that watermark detection can still match it.
+    """
     transformed = deepcopy(generations)
     for i, gens in enumerate(transformed):
         for j, gen in enumerate(gens):
-            transformed[i][j] = apply_transforms(gen, transforms, transformer)
+            if prompts and i < len(prompts):
+                prefix = prompts[i]
+                if gen.startswith(prefix):
+                    # Only transform the generated part, keep prefix intact
+                    generated_part = gen[len(prefix):]
+                    transformed_part = apply_transforms(generated_part, transforms, transformer)
+                    transformed[i][j] = prefix + transformed_part
+                else:
+                    # Fallback: transform entire text
+                    transformed[i][j] = apply_transforms(gen, transforms, transformer)
+            else:
+                transformed[i][j] = apply_transforms(gen, transforms, transformer)
     return transformed
+
+
+def load_humaneval_prompts():
+    """Load HumanEval prompts from the dataset."""
+    try:
+        import datasets as hf_datasets
+        dataset = hf_datasets.load_dataset("openai_humaneval", split="test")
+        return [doc["prompt"].strip() for doc in dataset]
+    except Exception as e:
+        print(f"Warning: Could not load HumanEval dataset: {e}")
+        print("Falling back to transforming entire generations (may cause prefix mismatch)")
+        return None
 
 
 def main():
@@ -235,6 +262,11 @@ def main():
     with open(args.input, 'r') as f:
         generations = json.load(f)
 
+    print("Loading HumanEval prompts...")
+    prompts = load_humaneval_prompts()
+    if prompts:
+        print(f"  Loaded {len(prompts)} prompts (will preserve prompt prefix during transformation)")
+
     transformer = CodeTransformer(seed=args.seed)
 
     # Define transformation sets
@@ -251,7 +283,7 @@ def main():
 
     for name, transforms in transform_sets.items():
         print(f"\nApplying transformation: {name} ({transforms})")
-        transformed = transform_generations(generations, transformer, transforms)
+        transformed = transform_generations(generations, transformer, transforms, prompts=prompts)
 
         output_path = os.path.join(args.output_dir, f'generations_{name}.json')
         with open(output_path, 'w') as f:

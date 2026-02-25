@@ -167,9 +167,12 @@ class Evaluator:
                             tokenized_text=tokenized_text,
                             tokenized_prefix=tokenized_prefix,
                             entropy=entropy,
+                            return_green_token_mask=True,
                         )
                         if not detection_result.pop('invalid', False):
                             detect_list.append(1 if detection_result['prediction'] else 0)
+                            # save token-level entropy for failure analysis
+                            detection_result['token_entropy'] = entropy[prefix_len:]
                             detection_results.append(detection_result)
 
                     # EXP-edit detector

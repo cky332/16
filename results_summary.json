@@ -1,0 +1,45 @@
+[
+  {
+    "task": "humaneval",
+    "total_samples": 164,
+    "detected": 0,
+    "detection_rate": 0.0,
+    "mean_z_score": -1.2841340959324943,
+    "mean_scored_tokens": 9.451219512195122,
+    "mean_gen_len": 58.65243902439025,
+    "mean_watermarking_fraction": 0.1823667670986923,
+    "mean_green_fraction": 0.4645791990941145,
+    "pct_below_16_scored": 0.8170731707317073,
+    "pass@1": 1.0,
+    "experiment": "outputs_sweet_human"
+  },
+  {
+    "task": "humaneval",
+    "total_samples": 164,
+    "detected": 35,
+    "detection_rate": 0.21341463414634146,
+    "mean_z_score": 1.7065262842485376,
+    "mean_scored_tokens": 11.713414634146341,
+    "mean_gen_len": 80.09756097560975,
+    "mean_watermarking_fraction": 0.2483903746525649,
+    "mean_green_fraction": 0.9776667771481106,
+    "pct_below_16_scored": 0.7865853658536586,
+    "pass@1": 0.2576219512195122,
+    "roc_auc": 0.9523720999405118,
+    "experiment": "outputs_sweet"
+  },
+  {
+    "task": "humaneval",
+    "total_samples": 164,
+    "detected": 1,
+    "detection_rate": 0.006097560975609756,
+    "mean_z_score": 0.1464600345574544,
+    "mean_scored_tokens": 19.359756097560975,
+    "mean_gen_len": 59.359756097560975,
+    "mean_watermarking_fraction": 0.42538606196121803,
+    "mean_green_fraction": 0.5141057245037381,
+    "pct_below_16_scored": 0.49390243902439024,
+    "pass@1": 0.31097560975609756,
+    "experiment": "outputs"
+  }
+]

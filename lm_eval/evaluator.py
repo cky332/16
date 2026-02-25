@@ -11,7 +11,6 @@ from lm_eval.utils import calculate_entropy
 from watermark import WatermarkDetector
 from sweet import SweetDetector
 from exp import EXPDetector
-import pdb
 
 _WARNING = """
 ################################################################################
@@ -111,8 +110,8 @@ class Evaluator:
                     try:
                         assert gen.startswith(prefix)
                     except AssertionError:
-                        print(f"{idx}, {idx2}")
-                        pdb.set_trace()
+                        print(f"Warning: prefix mismatch at {idx}, {idx2}, skipping")
+                        continue
 
                     tokenized_text = tokenize(gen)['input_ids'].squeeze()
 
@@ -122,10 +121,9 @@ class Evaluator:
                     except AssertionError:
                         print(f"{idx}, {idx2}")
                         # tokenizing issue.. check at least the lens are same
-                        if len(tokenized_text[:prefix_len]) == len(tokenized_prefix):
-                            pass
-                        else:
-                            pdb.set_trace()
+                        if len(tokenized_text[:prefix_len]) != len(tokenized_prefix):
+                            print(f"Warning: tokenization length mismatch at {idx}, {idx2}, skipping")
+                            continue
 
                     # if len of generation is 0, check next genertion
                     if len(tokenized_text) - prefix_len == 0:

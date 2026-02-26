@@ -33,8 +33,8 @@ for lang in $languages; do
 
     output_dir="outputs/sweet_multiple_${lang}"
 
-    # Generation phase
-    accelerate launch main.py \
+    # Generation phase (single process + device_map to avoid OOM)
+    accelerate launch --num_processes 1 main.py \
         --model bigcode/starcoder \
         --use_auth_token \
         --task "multiple-${lang}" \
@@ -52,6 +52,7 @@ for lang in $languages; do
         --gamma $gamma \
         --delta $delta \
         --entropy_threshold $entropy_threshold \
+        --device_map auto \
         --generation_only
 
     echo "Generation complete for ${lang}, output in ${output_dir}"

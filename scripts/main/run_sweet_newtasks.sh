@@ -6,6 +6,9 @@
 # 1. conala: single-line code, extremely short output
 # 2. apps: different difficulty levels
 # 3. ds1000 sub-libraries: API-heavy data science code
+#
+# Uses single process + device_map=auto to shard StarCoder across GPUs
+# (avoids OOM from loading full model on a single 24GB GPU)
 
 # Watermark parameters (matching actual experiment config)
 gamma=0.5
@@ -16,7 +19,7 @@ entropy_threshold=1.0
 echo "=========================================="
 echo "Running SWEET experiment for: CoNaLa"
 echo "=========================================="
-accelerate launch main.py \
+accelerate launch --num_processes 1 main.py \
     --model bigcode/starcoder \
     --use_auth_token \
     --task conala \
@@ -34,6 +37,7 @@ accelerate launch main.py \
     --gamma $gamma \
     --delta $delta \
     --entropy_threshold $entropy_threshold \
+    --device_map auto \
     --generation_only
 
 # ---- Task 2: APPS (different difficulty levels) ----
@@ -41,7 +45,7 @@ for level in introductory interview competition; do
     echo "=========================================="
     echo "Running SWEET experiment for: APPS-${level}"
     echo "=========================================="
-    accelerate launch main.py \
+    accelerate launch --num_processes 1 main.py \
         --model bigcode/starcoder \
         --use_auth_token \
         --task "apps-${level}" \
@@ -59,6 +63,7 @@ for level in introductory interview competition; do
         --gamma $gamma \
         --delta $delta \
         --entropy_threshold $entropy_threshold \
+        --device_map auto \
         --generation_only
 done
 
@@ -67,7 +72,7 @@ for lib in numpy pandas scipy matplotlib sklearn tensorflow pytorch; do
     echo "=========================================="
     echo "Running SWEET experiment for: DS-1000 ${lib}"
     echo "=========================================="
-    accelerate launch main.py \
+    accelerate launch --num_processes 1 main.py \
         --model bigcode/starcoder \
         --use_auth_token \
         --task "ds1000-${lib}-completion" \
@@ -85,6 +90,7 @@ for lib in numpy pandas scipy matplotlib sklearn tensorflow pytorch; do
         --gamma $gamma \
         --delta $delta \
         --entropy_threshold $entropy_threshold \
+        --device_map auto \
         --generation_only
 done
 
@@ -92,7 +98,7 @@ done
 echo "=========================================="
 echo "Running SWEET experiment for: MBPP"
 echo "=========================================="
-accelerate launch main.py \
+accelerate launch --num_processes 1 main.py \
     --model bigcode/starcoder \
     --use_auth_token \
     --task mbpp \
@@ -110,6 +116,7 @@ accelerate launch main.py \
     --gamma $gamma \
     --delta $delta \
     --entropy_threshold $entropy_threshold \
+    --device_map auto \
     --generation_only
 
 echo ""

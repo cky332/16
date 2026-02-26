@@ -23,7 +23,7 @@ for thresh in 0.1 0.3 0.5 0.8 1.0 1.5 2.0; do
     echo "--- entropy_threshold=${thresh} ---"
     output_dir="outputs/sweet_sweep_thresh_${thresh}"
 
-    accelerate launch main.py \
+    accelerate launch --num_processes 1 main.py \
         --model bigcode/starcoder \
         --use_auth_token \
         --task $task \
@@ -41,6 +41,7 @@ for thresh in 0.1 0.3 0.5 0.8 1.0 1.5 2.0; do
         --gamma $gamma \
         --delta $delta \
         --entropy_threshold $thresh \
+        --device_map auto \
         --generation_only
 done
 
@@ -53,7 +54,7 @@ for temp in 0.2 0.4 0.6 0.8 1.0; do
     echo "--- temperature=${temp} ---"
     output_dir="outputs/sweet_sweep_temp_${temp}"
 
-    accelerate launch main.py \
+    accelerate launch --num_processes 1 main.py \
         --model bigcode/starcoder \
         --use_auth_token \
         --task $task \
@@ -71,6 +72,7 @@ for temp in 0.2 0.4 0.6 0.8 1.0; do
         --gamma $gamma \
         --delta $delta \
         --entropy_threshold $entropy_threshold \
+        --device_map auto \
         --generation_only
 done
 
@@ -83,7 +85,7 @@ for d in 0.5 1.0 2.0 5.0 10.0; do
     echo "--- delta=${d} ---"
     output_dir="outputs/sweet_sweep_delta_${d}"
 
-    accelerate launch main.py \
+    accelerate launch --num_processes 1 main.py \
         --model bigcode/starcoder \
         --use_auth_token \
         --task $task \
@@ -101,6 +103,7 @@ for d in 0.5 1.0 2.0 5.0 10.0; do
         --gamma $gamma \
         --delta $d \
         --entropy_threshold $entropy_threshold \
+        --device_map auto \
         --generation_only
 done
 

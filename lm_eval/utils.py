@@ -137,11 +137,20 @@ def complete_code(
             if preprocess:
                 gen_kwargs["logits_processor"][0].preprocess(batch_size)
 
-            generated_tokens = model.generate(
-                input_ids=batch["ids"][:, : batch["input_len"]],
-                num_return_sequences=batch_size,
-                **gen_kwargs,
-            )
+            # Skip if prompt is already at or beyond max_length
+            input_len = batch["input_len"].item()
+            max_len = gen_kwargs.get("max_length", 2048)
+            if input_len >= max_len:
+                print(f"Warning: prompt length ({input_len}) >= max_length ({max_len}), skipping task {batch['task_id'].item()}")
+                # Return the input as-is (no generation) so downstream code still works
+                input_ids = batch["ids"][:, :input_len]
+                generated_tokens = input_ids.repeat(batch_size, 1)
+            else:
+                generated_tokens = model.generate(
+                    input_ids=batch["ids"][:, : batch["input_len"]],
+                    num_return_sequences=batch_size,
+                    **gen_kwargs,
+                )
             # each task is generated batch_size times
             generated_tasks = batch["task_id"].repeat(batch_size)
             generated_tokens = accelerator.pad_across_processes(

@@ -56,7 +56,7 @@ for level in introductory interview competition; do
         --do_sample \
         --top_p 0.95 \
         --n_samples 10 \
-        --max_length_generation 1024 \
+        --max_length_generation 2048 \
         --save_generations \
         --outputs_dir "outputs/sweet_apps_${level}" \
         --sweet \
@@ -83,7 +83,7 @@ for lib in numpy pandas scipy matplotlib sklearn tensorflow pytorch; do
         --do_sample \
         --top_p 0.5 \
         --n_samples 10 \
-        --max_length_generation 1024 \
+        --max_length_generation 2048 \
         --save_generations \
         --outputs_dir "outputs/sweet_ds1000_${lib}" \
         --sweet \
